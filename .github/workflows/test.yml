@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Cucumber tags to run, e.g. @smoke or @checkout'
+        default: '@smoke or @regression'
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run unit tests
+        run: mvn -B test -Dtest='PriceUtilsTest,SortUtilsTest,TestUserRepositoryTest'
+
+  ui-tests:
+    name: UI tests (headless Chrome)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    env:
+      TAGS: ${{ inputs.tags || '@smoke or @regression' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run Cucumber scenarios
+        run: mvn -B test -Dtest=RunCucumberTest -Dheadless=true -Dcucumber.filter.tags="$TAGS"
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cucumber-report
+          path: target/cucumber-reports/
